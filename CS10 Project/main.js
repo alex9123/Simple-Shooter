@@ -7,7 +7,6 @@ cnv.height = 800;
 // Global Variables
 let playerX = 100;
 let playerY = 150;
-let playerSize = 80;
 let playerRadius = 20;
 let playerColor = "blue"
 
@@ -24,11 +23,20 @@ let spawned = false
 let enemies = []
 let healthColor = ['red', 'yellow', 'orange', 'green']
 
-let caught = false
+let start = false 
+let end = false
 
-let CurrentAnimation
+function setUp() { // Start screen
+    ctx.fillText('Press Space to Start', 10, 50);
+}
 
-CurrentAnimation = requestAnimationFrame(update);
+function endScreen() { // end screen, game over
+    ctx.clearRect(0, 0, cnv.width, cnv.height);
+    ctx.fillText('Game Over, Press R to Restart', 10, 50);
+    end = true
+}
+
+let spawn
 
 function update() {
     ctx.clearRect(0, 0, cnv.width, cnv.height);
@@ -39,8 +47,11 @@ function update() {
 
     drawEnemy();
 
-    if (!caught) {
-        CurrentAnimation = requestAnimationFrame(update);
+    if (start) {
+        requestAnimationFrame(update);
+    } else {
+        clearInterval(spawn);
+        endScreen();
     }
 }
 
@@ -86,7 +97,7 @@ function attackLoop() {
         
 
         ctx.beginPath();
-        ctx.arc(bullets[i].x, bullets[i].y, 10, 0, Math.PI * 2, true);
+        ctx.arc(bullets[i].x, bullets[i].y, bullets[i].size, 0, Math.PI * 2, true);
         bullets[i].x += Math.cos(bullets[i].direction) * bullets[i].Bspeed
         bullets[i].y += Math.sin(bullets[i].direction) * bullets[i].Bspeed
         ctx.closePath();
@@ -95,23 +106,16 @@ function attackLoop() {
 
 
         for (ii = 0; ii < enemies.length; ii++) {
-            let distX = Math.abs(bullets[i].x - enemies[ii].x-50/2)
-            let distY = Math.abs(bullets[i].y - enemies[ii].y-50/2)
-            if (distX <= 25 &&
-                distY <= 25) 
-                {
+            if (CollisionDetect(bullets[i].x, bullets[i].y, bullets[i].size, enemies[ii].x, enemies[ii].y, enemies[ii].size)) {
                 bullets.splice(i, 1)
                 i--
                 if (enemies[ii].health <= 0) {
                     enemies.splice(ii, 1);
-                    ii--;
-                    
+                    ii--;  
                 } else {
                     enemies[ii].health -= 1
                 }
-                
             }
-
         }
     }
 }
@@ -128,14 +132,8 @@ function drawEnemy() {
         enemies[i].y += Math.sin(direction) * enemies[i].Bspeed
 
         // Collision
-        let distX = Math.abs(playerX - (enemies[i].x+enemies[i].size/2));
-        let distY = Math.abs(playerY - (enemies[i].y+enemies[i].size/2));
-
-        if (distX <= enemies[i].size &&
-            distY <= enemies[i].size
-            ) {
-            caught = true;
-            console.log(distX, distY, playerRadius)
+        if (CollisionDetect(playerX, playerY, playerRadius, enemies[i].x, enemies[i].y, enemies[i].size)) {
+            start = false;
         }
         
     }
@@ -181,6 +179,20 @@ function keyupHandler(event) {
     if (event.code == "ShiftLeft") {
         speed = 2;
     }
+    if (event.code == "Space") {
+        if (!start) {
+            requestAnimationFrame(update);
+            start = true
+            spawn = setInterval(SpawnEnemy, 2000); // spawn enemies
+        }
+    }
+    if (event.code == "KeyR") {
+        if (end) {
+            start = true
+            requestAnimationFrame(update);
+            end = false
+        }
+    }
 }
 
 function clickHandler(event) {
@@ -194,25 +206,84 @@ function clickHandler(event) {
         mX: mouseX,
         mY: mouseY,
         direction: Math.atan2(mouseY - playerY, mouseX - playerX),
-        Bspeed: 10
+        Bspeed: 10,
+        size: 10
     }
 
     bullets.push(object)
 
 }
 
-// Spawn Enemy every 2 seconds
-let t = setInterval(SpawnEnemy, 2000); 
 
 function SpawnEnemy() {
-    let object = {
-        x: 450,
-        y: 0,
-        size: 50,
-        Bspeed: 1,
-        health: 3
-    }
+    if (start) {
+        let object = {
+            x: 450,
+            y: 0,
+            size: 50,
+            Bspeed: 1,
+            health: 3
+        }
 
-    enemies.push(object)
-    spawned = true
+        enemies.push(object)
+        spawned = true
+    }
 }
+
+function CollisionDetect(circleX, circleY, radius, squareX, squareY, squareSize) { // suqare circle only
+    let closestPointX; // Closest point on square from circle
+    let closestPointY;
+    let Pythag = false; // if distance need pythagorean therom (if distance is diagonal)
+
+    if (circleX <= squareX) { // If circle to left of square
+        closestPointX = squareX;
+        if (circleY <= squareY) { // If circle is left and above square
+            closestPointY = squareY;
+            Pythag = true;
+        } else if (circleY >= squareY + squareSize) { // if circle is below square
+            closestPointY = squareY + squareSize;
+            Pythag = true;
+        } else { // if circle is aligned with square
+            closestPointY =  squareY + (circleY - squareY)
+        }
+    } else if (circleX >= squareX + squareSize) { // If circle is to right of square
+        closestPointX = squareX + squareSize;
+        if (circleY <= squareY) { // If circle is left and above square
+            closestPointY = squareY;
+            Pythag = true;
+        } else if (circleY >= squareY + squareSize) { // if circle is below square
+            closestPointY = squareY + squareSize;
+            Pythag = true;
+        } else { // if circle is aligned with square
+            closestPointY =  squareY + (circleY - squareY)
+        }
+    } else { // if circle is above or below circle 
+        closestPointX = squareX + (circleX - squareX)
+        if (circleY <= squareY) { // if above
+            closestPointY = squareY
+        } else { // if below
+            closestPointY = squareY + squareSize
+        }
+    }
+   
+    let distX = Math.abs(closestPointX - circleX);
+    let distY = Math.abs(closestPointY - circleY);
+
+    if (Pythag) {
+        if (Math.sqrt((distX * distX) + (distY * distY)) <= radius) {
+            return true;
+        } else {
+            return false;
+        }
+    } else {
+        if (distX < radius &&
+            distY < radius
+            ) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
+setUp()
