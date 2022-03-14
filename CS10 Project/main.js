@@ -8,6 +8,8 @@ cnv.height = 800;
 let playerX = 100;
 let playerY = 150;
 let playerRadius = 20;
+let playerLives = 3;
+let playerImmunity = false; // if damaged, temporary immunity
 let playerColor = "blue"
 
 let moveLeft = false
@@ -23,39 +25,47 @@ let spawned = false
 let enemies = []
 let healthColor = ['red', 'yellow', 'orange', 'green']
 
-let start = false 
-let end = false
+let money = 0
+
+let start = false // start/stops game
+let initiate = false // initiate game (can only occur once)
 
 function setUp() { // Start screen
-    ctx.fillText('Press Space to Start', 10, 50);
+    ctx.font = "30px Comic Sans MS";
+    ctx.textAlign = "center";
+    ctx.fillText('Press Space to Start', cnv.width/2, cnv.height/2);
 }
 
 function endScreen() { // end screen, game over
     ctx.clearRect(0, 0, cnv.width, cnv.height);
-    ctx.fillText('Game Over, Press R to Restart', 10, 50);
-    end = true
+    ctx.fillStyle = "red"
+    ctx.font = "30px Comic Sans MS";
+    ctx.textAlign = "center";
+    ctx.fillText('Press R to Restart', cnv.width/2, cnv.height/2);
+    start = false
 }
-
-let spawn
 
 function update() {
     ctx.clearRect(0, 0, cnv.width, cnv.height);
 
-    move();
+    document.addEventListener("click", clickHandler)
 
-    attackLoop();
+    move(); // Player Movement
 
-    drawEnemy();
+    attackLoop(); // Shooting 
+
+    drawEnemy(); // Enememy spawn
+
+    drawInformation() // Money + Lives
 
     if (start) {
         requestAnimationFrame(update);
     } else {
-        clearInterval(spawn);
         endScreen();
     }
 }
 
-
+let flicker = false
 
 function move() {
     if (playerY > 0) {
@@ -83,11 +93,28 @@ function move() {
     }
 
 
-    let Player = new Path2D()
-    ctx.fillStyle = "blue";
-    Player.arc(playerX, playerY, playerRadius, 0, Math.PI * 2, true);
-    ctx.fill(Player);
-    
+    if (playerImmunity) {
+        let Player = new Path2D()
+        ctx.fillStyle = playerColor;
+        Player.arc(playerX, playerY, playerRadius, 0, Math.PI * 2, true);
+        ctx.fill(Player);
+        if (!flicker) {
+            flicker = true;
+            setTimeout(function() {
+                if (playerColor === "blue") {
+                    playerColor = "white"
+                } else {
+                    playerColor = "blue"
+                }
+                flicker = false
+            }, 100);
+        }
+    } else {
+        let Player = new Path2D()
+        ctx.fillStyle = "blue";
+        Player.arc(playerX, playerY, playerRadius, 0, Math.PI * 2, true);
+        ctx.fill(Player);
+    }   
 }
 
 
@@ -111,9 +138,11 @@ function attackLoop() {
                 i--
                 if (enemies[ii].health <= 0) {
                     enemies.splice(ii, 1);
+                    money += 10;
                     ii--;  
                 } else {
                     enemies[ii].health -= 1
+                    ii--;
                 }
             }
         }
@@ -127,23 +156,41 @@ function drawEnemy() {
         ctx.fillStyle = healthColor[enemies[i].health];
         ctx.fillRect(enemies[i].x, enemies[i].y, enemies[i].size, enemies[i].size);
         let direction = Math.atan2(playerY - enemies[i].y, enemies[i].x - playerX);
-
         enemies[i].x += Math.cos(direction) * -enemies[i].Bspeed
         enemies[i].y += Math.sin(direction) * enemies[i].Bspeed
 
         // Collision
         if (CollisionDetect(playerX, playerY, playerRadius, enemies[i].x, enemies[i].y, enemies[i].size)) {
-            start = false;
+            if (!playerImmunity) {
+                if (playerLives > 0) {
+                    playerLives--;
+                    playerImmunity = true;
+                    setTimeout(function() {
+                        playerImmunity = false;
+                    }, 2000);
+                } else {
+                    start = false;
+                }
+            } 
         }
         
     }
 
 }
 
+
+
+function drawInformation() {
+    ctx.fillStyle = "green"
+    ctx.font = "30px Comic Sans MS";
+    ctx.textAlign = "center ";
+    ctx.fillText('Money: ' + money, cnv.width/2, 40);
+    ctx.fillText('Lives: ' + playerLives, cnv.width/2, 775);
+}
+
 // Event Functions
 document.addEventListener("keydown", keydownHandler);
 document.addEventListener("keyup", keyupHandler);
-document.addEventListener("click", clickHandler)
 
 function keydownHandler(event) {
     if (event.code == "KeyW") {
@@ -160,6 +207,26 @@ function keydownHandler(event) {
     }
     if (event.code == "ShiftLeft") {
         speed = 5;
+    }
+    if (event.code == "Space") {
+        if (!initiate) {
+            requestAnimationFrame(update);
+            initiate = true;
+            start = true;
+            spawn = setInterval(SpawnEnemy, 2000); // spawn enemies
+        }
+    }
+    if (event.code == "KeyR") { // Reset game
+        if (!start && initiate) {
+            bullets = []
+            enemies = []
+            playerX = 100;
+            playerY = 150;
+            money = 0;
+            playerLives = 3;
+            start = true;
+            requestAnimationFrame(update);
+        }
     }
 }
 
@@ -178,20 +245,6 @@ function keyupHandler(event) {
     }
     if (event.code == "ShiftLeft") {
         speed = 2;
-    }
-    if (event.code == "Space") {
-        if (!start) {
-            requestAnimationFrame(update);
-            start = true
-            spawn = setInterval(SpawnEnemy, 2000); // spawn enemies
-        }
-    }
-    if (event.code == "KeyR") {
-        if (end) {
-            start = true
-            requestAnimationFrame(update);
-            end = false
-        }
     }
 }
 
@@ -285,5 +338,6 @@ function CollisionDetect(circleX, circleY, radius, squareX, squareY, squareSize)
         }
     }
 }
+
 
 setUp()
